@@ -345,8 +345,8 @@ ALTER table ct_orders
 		FOREIGN KEY (addr_from_id) REFERENCES ct_address(id),
 	ADD CONSTRAINT ct_orders_addr_to_id_fk
 		FOREIGN KEY (addr_to_id) REFERENCES ct_address(id);
-		
-
+	
+	
 -- “–»√√≈–€
 	
 DROP TRIGGER IF EXISTS driver_passport_update;
@@ -385,7 +385,7 @@ BEGIN
 		OR NEW.issue_date != OLD.issue_date  
 		OR NEW.valid_until != OLD.valid_until 
 		OR NEW.category != OLD.category  THEN 
-			insert ht_driver_passport(driver_id, license_number, issue_date, valid_until, category, created_at)
+			insert into ht_driving_license(driver_id, license_number, issue_date, valid_until, category, created_at)
 			VALUES (old.driver_id, old.license_number, old.issue_date, old.valid_until, old.category, old.created_at);
 	END IF;
 END//
@@ -393,23 +393,65 @@ DELIMITER ;
 
 DROP TRIGGER IF EXISTS insurance_update;
 DELIMITER //
-CREATE TRIGGER insurance_update_update AFTER UPDATE ON ct_insurance
+CREATE TRIGGER insurance_update AFTER UPDATE ON ct_insurance
 FOR EACH ROW
 BEGIN
 	IF NEW.insurance_number != OLD.insurance_number 
 		OR NEW.issue_date != OLD.issue_date  
 		OR NEW.valid_until != OLD.valid_until THEN 
-			insert ht_driver_passport(driver_id, insurance_number, issue_date, valid_until, created_at)
-			VALUES (old.driver_id, old.insurance_number, old.issue_date, old.valid_until, old.created_at);
+			insert ht_insurance(driver_id, insurance_number, issue_date, valid_until, active, created_at)
+			VALUES (old.driver_id, old.insurance_number, old.issue_date, old.valid_until, old.active, old.created_at);
 	END IF;
 END//
 DELIMITER ;
 
 
+DROP TRIGGER IF EXISTS driving_license_check;
+DELIMITER //
+CREATE TRIGGER driving_license_check AFTER INSERT ON ct_driving_license
+FOR EACH ROW
+BEGIN
+	IF new.id not in (select IFNULL(driving_license_id, 0) from ct_drivers) THEN 
+		update ct_drivers
+		SET driving_license_id = new.id
+		where ct_drivers.id = new.driver_id;
+	END IF;
+END//
+DELIMITER ;		
+		
+
+DROP TRIGGER IF EXISTS insurance_check;
+DELIMITER //
+CREATE TRIGGER insurance_check AFTER INSERT ON ct_insurance
+FOR EACH ROW
+BEGIN
+	IF new.id not in (select IFNULL(insurance_id , 0) from ct_drivers) THEN 
+		update ct_drivers
+		SET insurance_id = new.id
+		where ct_drivers.id = new.driver_id;
+	END IF;
+END//
+DELIMITER ;	
+
+
+DROP TRIGGER IF EXISTS driver_passport_check;
+DELIMITER //
+CREATE TRIGGER driver_passport_check AFTER INSERT ON ct_driver_passport
+FOR EACH ROW
+BEGIN
+	IF new.id not in (select IFNULL(passport_id, 0) from ct_drivers) THEN 
+		update ct_drivers
+		SET passport_id = new.id
+		where ct_drivers.id = new.driver_id;
+	END IF;
+END//
+DELIMITER ;	
+
+
 -- œ–≈ƒ—“¿¬À≈Õ»ﬂ
--- DROP VIEW IF EXISTS driver_trips;
--- -- CREATE VIEW driver_trips AS 
-SELECT 
+DROP VIEW IF EXISTS driver_trips;
+CREATE VIEW driver_trips AS 
+SELECT
 di.id,
 di.last_name,
 di.first_name,
@@ -424,8 +466,20 @@ di.id,
 di.last_name,
 di.first_name,
 di.middle_name,
-city.city_name
-ORDER BY total_trip DESC;
+city.city_name;
 
 
-
+DROP VIEW IF EXISTS City_trips;
+CREATE VIEW City_trips AS 
+SELECT
+city.city_name,
+DATE_FORMAT(tr.date_trip, '%d.%m.%Y') as date_trip,
+COUNT(tr.addr_from_id) as count_trips,
+SUM(tr.cost_trip) as sum_of_trips
+-- COUNT(tr.addr_from_id) as count_trips
+FROM cat_city city
+left join ct_address ca on ca.city_id = city.id
+left join ct_trips tr on tr.addr_from_id = ca.id
+GROUP BY
+city.city_name,
+DATE_FORMAT(tr.date_trip, '%d.%m.%Y');
