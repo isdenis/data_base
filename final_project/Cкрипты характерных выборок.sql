@@ -59,7 +59,7 @@ where order_is_done = 1
 GROUP BY cc.city_name) ord_done on ord_done.city_name = cc.city_name
 ORDER BY percent_of_completion DESC;
 
--- выборка водителей, у который через неделю заканчивается срок действия страховки
+-- выборка водителей, у который на дату проверки закончилась страховка
 SELECT 
 cd.first_name,
 cd.last_name,
